@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>CantiereFlow</title>
+<style>
+:root{--bg:#f3f5f7;--card:#fff;--ink:#17202a;--muted:#6b7280;--blue:#1769e0;--green:#16855b;--red:#c33;--line:#e5e7eb}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#111827;color:#fff;padding:calc(18px + env(safe-area-inset-top)) 18px 18px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:24px} header p{margin:5px 0 0;color:#cbd5e1;font-size:13px}
+main{max-width:760px;margin:auto;padding:14px 14px 95px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 1px 5px #0000000d}
+h2{font-size:17px;margin:0 0 12px}.small{font-size:12px;color:var(--muted)}
+button,input,select{font:inherit}button{border:0;border-radius:11px;padding:11px 13px;font-weight:700;background:#e8eef8;color:#17447d}
+button.primary{background:var(--blue);color:#fff}button.green{background:var(--green);color:#fff}button.danger{background:#fee2e2;color:#991b1b}
+input,select{width:100%;padding:11px;border:1px solid #d8dde5;border-radius:10px;background:#fff;margin:5px 0}
+.worker{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}.worker:last-child{border:0}.worker b{flex:1}
+.badge{font-size:11px;padding:4px 7px;border-radius:20px;background:#eef2ff;color:#3730a3}
+.site{border:1px solid var(--line);border-radius:13px;padding:11px;margin:8px 0}.sitehead{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.assign{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{background:#ecfdf5;color:#065f46;border-radius:20px;padding:6px 9px;font-size:12px}
+.log{padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;padding:7px 7px calc(7px + env(safe-area-inset-bottom));z-index:6}
+nav button{flex:1;background:transparent;color:#667085;padding:8px 3px;font-size:12px}nav button.active{color:var(--blue)}
+.view{display:none}.view.active{display:block}.warn{background:#fff7ed;color:#9a3412;padding:10px;border-radius:10px;font-size:12px;margin:8px 0}
+@media(max-width:420px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>🏗️ CantiereFlow</h1><p id="today"></p></header>
+<main>
+<section id="day" class="view active">
+ <div class="card"><h2>Situazione di oggi</h2><div id="summary"></div></div>
+ <div class="card"><h2>Cantieri e squadre</h2><div id="sites"></div>
+ <button class="primary" onclick="addSite()">+ Aggiungi cantiere</button></div>
+</section>
+<section id="people" class="view">
+ <div class="card"><h2>Persone</h2><div id="workers"></div></div>
+ <div class="card"><h2>Aggiungi persona</h2><input id="newName" placeholder="Nome"><select id="newRole"><option>Muratore</option><option>Elettricista</option><option>Operaio</option><option>Altro</option></select><button class="green" onclick="addWorker()">Aggiungi</button></div>
+</section>
+<section id="history" class="view">
+ <div class="card"><h2>Movimenti della giornata</h2><div id="logs"></div><button class="danger" onclick="clearLogs()">Svuota storico</button></div>
+</section>
+<section id="settings" class="view">
+ <div class="card"><h2>Gestione dati</h2><p class="small">I dati restano salvati su questo iPhone/browser.</p><button onclick="exportData()">Esporta backup</button> <button class="danger" onclick="resetAll()">Ripristina app</button></div>
+</section>
+</main>
+<nav>
+<button class="active" onclick="showView('day',this)">🏗️<br>Oggi</button>
+<button onclick="showView('people',this)">👷<br>Persone</button>
+<button onclick="showView('history',this)">🕘<br>Storico</button>
+<button onclick="showView('settings',this)">⚙️<br>Altro</button>
+</nav>
+<script>
+const KEY='cantiereFlow_v1';
+const initial={workers:[
+{id:1,name:'Muratore 1',role:'Muratore'},{id:2,name:'Muratore 2',role:'Muratore'},{id:3,name:'Elettricista',role:'Elettricista'},
+{id:4,name:'Operaio 1',role:'Operaio'},{id:5,name:'Operaio 2',role:'Operaio'},{id:6,name:'Operaio 3',role:'Operaio'}],
+sites:[{id:1,name:'Cantiere 1',workers:[1,4]},{id:2,name:'Cantiere 2',workers:[2,5]},{id:3,name:'Cantiere 3',workers:[3,6]}],logs:[]};
+let data=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(initial);
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));render()};
+function log(msg){data.logs.unshift({t:new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),msg});}
+function roleQualified(r){return r==='Muratore'||r==='Elettricista'}
+function render(){
+ document.getElementById('today').textContent=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+ document.getElementById('workers').innerHTML=data.workers.map(w=>`<div class="worker"><b>${esc(w.name)}</b><span class="badge">${esc(w.role)}</span><button onclick="editWorker(${w.id})">Modifica</button></div>`).join('');
+ let assigned=new Set(data.sites.flatMap(s=>s.workers)); let free=data.workers.filter(w=>!assigned.has(w.id));
+ document.getElementById('summary').innerHTML=`<div class="grid"><div><b>${data.workers.length}</b><div class="small">persone</div></div><div><b>${data.sites.length}/4</b><div class="small">cantieri</div></div></div>${free.length?`<div class="warn">Non assegnati: ${free.map(x=>esc(x.name)).join(', ')}</div>`:''}`;
+ document.getElementById('sites').innerHTML=data.sites.map(s=>{
+  let ws=s.workers.map(id=>data.workers.find(w=>w.id===id)).filter(Boolean);
+  let q=ws.filter(w=>roleQualified(w.role)).length;
+  return `<div class="site"><div class="sitehead"><b>${esc(s.name)}</b><span class="small">${ws.length} persone</span></div>
+  ${ws.length&&!q?'<div class="warn">⚠️ Nessuna persona qualificata in questa squadra</div>':''}
+  <div class="assign">${ws.map(w=>`<span class="chip">${esc(w.name)} ×</span>`).join('')}</div>
+  <select onchange="assign(${s.id},this.value);this.value=''"><option value="">+ Sposta/aggiungi persona…</option>${data.workers.map(w=>`<option value="${w.id}">${esc(w.name)} — ${esc(w.role)}</option>`).join('')}</select>
+  <button onclick="renameSite(${s.id})">Rinomina</button> <button class="danger" onclick="removeSite(${s.id})">Chiudi</button></div>`;
+ }).join('');
+ document.getElementById('logs').innerHTML=data.logs.length?data.logs.map(l=>`<div class="log"><b>${l.t}</b> — ${esc(l.msg)}</div>`).join(''):'<p class="small">Nessun movimento registrato.</p>';
+}
+function assign(siteId,val){if(!val)return; let id=+val,w=data.workers.find(x=>x.id===id),dest=data.sites.find(x=>x.id===siteId);data.sites.forEach(s=>s.workers=s.workers.filter(x=>x!==id));dest.workers.push(id);log(`${w.name} → ${dest.name}`);save()}
+function addSite(){if(data.sites.length>=4)return alert('Hai già raggiunto il massimo di 4 cantieri.');let name=prompt('Nome del nuovo cantiere:','Cantiere '+(data.sites.length+1));if(!name)return;data.sites.push({id:Date.now(),name,workers:[]});log(`Aperto ${name}`);save()}
+function removeSite(id){let s=data.sites.find(x=>x.id===id);if(confirm(`Chiudere ${s.name}? Le persone resteranno non assegnate.`)){data.sites=data.sites.filter(x=>x.id!==id);log(`Chiuso ${s.name}`);save()}}
+function renameSite(id){let s=data.sites.find(x=>x.id===id),n=prompt('Nuovo nome:',s.name);if(n){s.name=n;save()}}
+function addWorker(){let n=document.getElementById('newName').value.trim(),r=document.getElementById('newRole').value;if(!n)return alert('Inserisci il nome.');data.workers.push({id:Date.now(),name:n,role:r});log(`Aggiunto ${n}`);document.getElementById('newName').value='';save()}
+function editWorker(id){let w=data.workers.find(x=>x.id===id),n=prompt('Nome:',w.name);if(!n)return;let r=prompt('Ruolo (Muratore, Elettricista, Operaio, Altro):',w.role);w.name=n;w.role=r||w.role;save()}
+function clearLogs(){if(confirm('Svuotare lo storico?')){data.logs=[];save()}}
+function resetAll(){if(confirm('Ripristinare tutti i dati iniziali?')){data=structuredClone(initial);save()}}
+function exportData(){let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='cantiereflow-backup.json';a.click()}
+function showView(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+render();
+</script>
+</body></html>
